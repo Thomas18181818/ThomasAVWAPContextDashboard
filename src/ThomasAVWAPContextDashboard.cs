@@ -35,7 +35,7 @@ namespace NinjaTrader.NinjaScript.Indicators
         private VWAP sessionVwap;
         private ATR atr;
         private SMA volumeSma;
-        private Indicators.ThomasAnchoredVWAP_Test anchoredAvwap;
+        private VWAP anchoredAvwap;
 
         private TrendRegime currentRegime = TrendRegime.Neutral;
         private int regimeScore = 0;
@@ -201,7 +201,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                     if (UseVolumeFilter)
                         volumeSma = SMA(Volume, VolumeSmaPeriod);
 
-                    anchoredAvwap = Indicators.ThomasAnchoredVWAP_Test();
+                    anchoredAvwap = VWAP();
                     break;
             }
         }
