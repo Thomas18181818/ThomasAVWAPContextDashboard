@@ -337,7 +337,16 @@ namespace NinjaTrader.NinjaScript.Indicators
             DrawSignal();
 
             if (EnableAlerts)
-                Alert("ThomasAVWAPLiteLong" + CurrentBar, Priority.High, AlertMessage, AlertSound, 0, Brushes.Transparent, Brushes.DeepSkyBlue);
+            {
+                Alert(
+                    "ThomasAVWAPLiteLong" + CurrentBar,
+                    Priority.High,
+                    AlertMessage,
+                    AlertSound,
+                    0,
+                    Brushes.Transparent,
+                    Brushes.DeepSkyBlue);
+            }
         }
 
         private void DrawSignal()
@@ -368,13 +377,26 @@ namespace NinjaTrader.NinjaScript.Indicators
             string distAtrText = double.IsNaN(lastDistanceAtr) ? "n/a" : lastDistanceAtr.ToString("0.00");
             panelBuilder.AppendLine($"Dist AVWAP : {distTicksText} ticks / {distAtrText} ATR");
 
-            bool ready = EnablePullbackDetection && (currentRegime == TrendRegime.Bull || currentRegime == TrendRegime.StrongBull) && isCloseToAvwap && hasAvwap;
+            bool ready = EnablePullbackDetection
+                && (currentRegime == TrendRegime.Bull || currentRegime == TrendRegime.StrongBull)
+                && isCloseToAvwap
+                && hasAvwap;
             panelBuilder.AppendLine($"Setup AVWAP lite : {(ready ? "Ready" : "No")}");
 
             string lastSig = lastSignalBar < 0 ? "Aucun signal" : $"{CurrentBar - lastSignalBar} bars ago";
             panelBuilder.AppendLine($"Last Signal : {lastSig}");
 
-            Draw.TextFixed(this, "TAVWAP_PANEL", panelBuilder.ToString(), PanelPosition, Brushes.White, new SimpleFont("Arial", PanelFontSize), panelBackground, Brushes.Transparent, PanelOffsetX, PanelOffsetY);
+            Draw.TextFixed(
+                this,
+                "TAVWAP_PANEL",
+                panelBuilder.ToString(),
+                PanelPosition,
+                Brushes.White,
+                new SimpleFont("Arial", PanelFontSize),
+                panelBackground,
+                Brushes.Transparent,
+                PanelOffsetX,
+                PanelOffsetY);
         }
 
         private Brush GetRegimeBrush()
