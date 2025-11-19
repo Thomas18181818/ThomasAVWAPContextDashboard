@@ -8,9 +8,11 @@ using System.Xml.Serialization;
 using NinjaTrader.Core.FloatingPoint;
 using NinjaTrader.Data;
 using NinjaTrader.Gui;
+using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.Indicators;
+using NinjaTrader.NinjaScript.DrawingTools;
 using System.Windows.Media;
 #endregion
 
