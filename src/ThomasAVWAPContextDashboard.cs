@@ -259,7 +259,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private void UpdateAvwapMetrics()
         {
-            hasAvwap = anchoredAvwap != null && !anchoredAvwap[0].IsNaN();
+            hasAvwap = anchoredAvwap != null && !double.IsNaN(anchoredAvwap[0]);
             if (!hasAvwap)
             {
                 lastDistanceTicks = double.NaN;
@@ -310,7 +310,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (!UseVolumeFilter)
                 return true;
 
-            if (volumeSma == null || CurrentBar < VolumeSmaPeriod || volumeSma[0].IsNaN())
+            if (volumeSma == null || CurrentBar < VolumeSmaPeriod || double.IsNaN(volumeSma[0]))
                 return false;
 
             return Volume[0] >= 0.5 * volumeSma[0];
