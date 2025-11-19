@@ -192,7 +192,6 @@ namespace NinjaTrader.NinjaScript.Indicators
                     break;
 
                 case State.Configure:
-                    TradingHours = SessionTemplate;
                     break;
 
                 case State.DataLoaded:
