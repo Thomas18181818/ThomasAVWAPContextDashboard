@@ -253,7 +253,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (EnableTrendColoring)
             {
                 Brush regimeBrush = GetRegimeBrush();
-                BackBrush = regimeBrush;
+                BackBrushes[0][0] = regimeBrush;
             }
         }
 
@@ -397,7 +397,8 @@ namespace NinjaTrader.NinjaScript.Indicators
                 panelBackground,
                 Brushes.Transparent,
                 PanelOffsetX,
-                PanelOffsetY);
+                PanelOffsetY,
+                false);
         }
 
         private Brush GetRegimeBrush()
