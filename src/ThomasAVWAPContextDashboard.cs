@@ -392,5 +392,14 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
         }
         #endregion
+
+        #region Séries / Plots
+        [Browsable(false)]
+        [XmlIgnore]
+        public Series<double> LongSignal
+        {
+            get { return Values[0]; }
+        }
+        #endregion
     }
 }
