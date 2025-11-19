@@ -213,7 +213,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             int barsRequired = Math.Max(Math.Max(FastEmaPeriod, SlowEmaPeriod), AtrPeriod) + 2;
             if (CurrentBar < barsRequired)
             {
-                LongSignal[0] = 0;
+                Values[0][0] = 0;
                 return;
             }
 
@@ -254,7 +254,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (EnableTrendColoring)
             {
                 Brush regimeBrush = GetRegimeBrush();
-                BackBrushes[0] = regimeBrush;
+                BackBrush = regimeBrush;
             }
         }
 
@@ -319,7 +319,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
         private void DetectPullbackSignal()
         {
-            LongSignal[0] = 0;
+            Values[0][0] = 0;
 
             bool bullishRegime = currentRegime == TrendRegime.Bull || currentRegime == TrendRegime.StrongBull;
             if (!EnablePullbackDetection || !bullishRegime || !hasAvwap || !isCloseToAvwap)
@@ -334,7 +334,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (!IsPullbackStructureValid())
                 return;
 
-            LongSignal[0] = 1;
+            Values[0][0] = 1;
             lastSignalBar = CurrentBar;
             DrawSignal();
 
