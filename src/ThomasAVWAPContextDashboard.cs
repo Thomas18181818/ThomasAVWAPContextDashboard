@@ -1,22 +1,20 @@
-#region Using declarations
+#region Using declarations 
 using System;
 using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Text;
 using System.Xml.Serialization;
-using NinjaTrader.Core.FloatingPoint;
 using NinjaTrader.Data;
 using NinjaTrader.Gui;
-using NinjaTrader.Gui.Chart;
 using NinjaTrader.Gui.Tools;
+using NinjaTrader.Gui.Chart;
 using NinjaTrader.NinjaScript;
 using NinjaTrader.NinjaScript.Indicators;
 using NinjaTrader.NinjaScript.DrawingTools;
 using System.Windows.Media;
 #endregion
 
-// Ce code est prêt pour NinjaTrader 8 (OnBarClose), sans dépendances externes
 namespace NinjaTrader.NinjaScript.Indicators
 {
     public class ThomasAVWAPContextDashboard : Indicator
@@ -155,7 +153,6 @@ namespace NinjaTrader.NinjaScript.Indicators
                     Description = "Dashboard tendance + AVWAP + pullback AVWAP lite + info panel.";
                     Calculate = Calculate.OnBarClose;
                     IsOverlay = true;
-                    DisplayName = Name;
 
                     FastEmaPeriod = 20;
                     SlowEmaPeriod = 50;
@@ -192,6 +189,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                     break;
 
                 case State.Configure:
+                    TradingHours = SessionTemplate;
                     break;
 
                 case State.DataLoaded:
@@ -212,7 +210,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             int barsRequired = Math.Max(Math.Max(FastEmaPeriod, SlowEmaPeriod), AtrPeriod) + 2;
             if (CurrentBar < barsRequired)
             {
-                Values[0][0] = 0;
+                LongSignal[0] = 0;
                 return;
             }
 
@@ -251,15 +249,14 @@ namespace NinjaTrader.NinjaScript.Indicators
             }
 
             if (EnableTrendColoring)
-            {
-                Brush regimeBrush = GetRegimeBrush();
-                BackBrushes[0][0] = regimeBrush;
-            }
+                BackBrushes[0] = GetRegimeBrush();
         }
 
         private void UpdateAvwapMetrics()
         {
-            hasAvwap = anchoredAvwap != null && !double.IsNaN(anchoredAvwap[0]);
+            double avwapVal = anchoredAvwap != null ? anchoredAvwap[0] : double.NaN;
+            hasAvwap = !double.IsNaN(avwapVal);
+
             if (!hasAvwap)
             {
                 lastDistanceTicks = double.NaN;
@@ -268,16 +265,30 @@ namespace NinjaTrader.NinjaScript.Indicators
                 return;
             }
 
-            double avwapValue = anchoredAvwap[0];
-            double diff = Math.Abs(Close[0] - avwapValue);
+            double diff = Math.Abs(Close[0] - avwapVal);
             lastDistanceTicks = diff / TickSize;
+
             double atrValue = atr[0];
-            lastDistanceAtr = atrValue.ApproxCompare(0) == 0 ? double.NaN : diff / atrValue;
+            if (double.IsNaN(atrValue) || atrValue == 0)
+            {
+                lastDistanceAtr = double.NaN;
+            }
+            else
+            {
+                lastDistanceAtr = diff / atrValue;
+            }
 
             if (UseAtrProximity)
-                isCloseToAvwap = atrValue.ApproxCompare(0) != 0 && diff <= AvwapProximityAtr * atrValue;
+            {
+                if (double.IsNaN(atrValue) || atrValue == 0)
+                    isCloseToAvwap = false;
+                else
+                    isCloseToAvwap = diff <= AvwapProximityAtr * atrValue;
+            }
             else
+            {
                 isCloseToAvwap = lastDistanceTicks <= AvwapProximityTicks;
+            }
         }
 
         private bool IsPullbackStructureValid()
@@ -286,6 +297,9 @@ namespace NinjaTrader.NinjaScript.Indicators
             double range = High[0] - Low[0];
             double body = Math.Abs(Close[0] - Open[0]);
 
+            if (double.IsNaN(atrValue) || atrValue <= 0)
+                return false;
+
             if (range < 0.3 * atrValue || body < 0.1 * atrValue)
                 return false;
 
@@ -293,12 +307,11 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (!correction)
                 return false;
 
-            bool bullishCandle = Close[0] > Open[0];
-            if (!bullishCandle)
+            if (Close[0] <= Open[0])
                 return false;
 
             double lowerWick = Close[0] - Low[0];
-            if (body.ApproxCompare(0) == 0 || lowerWick < 1.5 * body)
+            if (body <= 0 || lowerWick < 1.5 * body)
                 return false;
 
             double position = (Close[0] - Low[0]) / range;
@@ -310,15 +323,19 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (!UseVolumeFilter)
                 return true;
 
-            if (volumeSma == null || CurrentBar < VolumeSmaPeriod || double.IsNaN(volumeSma[0]))
+            if (volumeSma == null || CurrentBar < VolumeSmaPeriod)
                 return false;
 
-            return Volume[0] >= 0.5 * volumeSma[0];
+            double sma = volumeSma[0];
+            if (double.IsNaN(sma) || sma <= 0)
+                return false;
+
+            return Volume[0] >= 0.5 * sma;
         }
 
         private void DetectPullbackSignal()
         {
-            Values[0][0] = 0;
+            LongSignal[0] = 0;
 
             bool bullishRegime = currentRegime == TrendRegime.Bull || currentRegime == TrendRegime.StrongBull;
             if (!EnablePullbackDetection || !bullishRegime || !hasAvwap || !isCloseToAvwap)
@@ -333,7 +350,7 @@ namespace NinjaTrader.NinjaScript.Indicators
             if (!IsPullbackStructureValid())
                 return;
 
-            Values[0][0] = 1;
+            LongSignal[0] = 1;
             lastSignalBar = CurrentBar;
             DrawSignal();
 
@@ -358,8 +375,7 @@ namespace NinjaTrader.NinjaScript.Indicators
 
             if (signalTags.Count > MaxSignals)
             {
-                string oldest = signalTags[0];
-                RemoveDrawObject(oldest);
+                RemoveDrawObject(signalTags[0]);
                 signalTags.RemoveAt(0);
             }
         }
@@ -396,9 +412,7 @@ namespace NinjaTrader.NinjaScript.Indicators
                 new SimpleFont("Arial", PanelFontSize),
                 panelBackground,
                 Brushes.Transparent,
-                PanelOffsetX,
-                PanelOffsetY,
-                false);
+                0);
         }
 
         private Brush GetRegimeBrush()
@@ -427,3 +441,60 @@ namespace NinjaTrader.NinjaScript.Indicators
         #endregion
     }
 }
+
+#region NinjaScript generated code. Neither change nor remove.
+
+namespace NinjaTrader.NinjaScript.Indicators
+{
+public partial class Indicator : NinjaTrader.Gui.NinjaScript.IndicatorRenderBase
+{
+private ThomasAVWAPContextDashboard[] cacheThomasAVWAPContextDashboard;
+public ThomasAVWAPContextDashboard ThomasAVWAPContextDashboard(int fastEmaPeriod, int slowEmaPeriod, int avwapProximityTicks, bool useAtrProximity, double avwapProximityAtr, int atrPeriod, bool enableTrendColoring, bool enablePullbackDetection, bool showInfoPanel, int panelFontSize, TextPosition panelPosition, int panelOffsetX, int panelOffsetY, bool enableAlerts, string alertMessage, string alertSound, int minBarsBetweenSignals, int maxSignals, bool useVolumeFilter, int volumeSmaPeriod)
+{
+return ThomasAVWAPContextDashboard(Input, fastEmaPeriod, slowEmaPeriod, avwapProximityTicks, useAtrProximity, avwapProximityAtr, atrPeriod, enableTrendColoring, enablePullbackDetection, showInfoPanel, panelFontSize, panelPosition, panelOffsetX, panelOffsetY, enableAlerts, alertMessage, alertSound, minBarsBetweenSignals, maxSignals, useVolumeFilter, volumeSmaPeriod);
+}
+
+public ThomasAVWAPContextDashboard ThomasAVWAPContextDashboard(ISeries<double> input, int fastEmaPeriod, int slowEmaPeriod, int avwapProximityTicks, bool useAtrProximity, double avwapProximityAtr, int atrPeriod, bool enableTrendColoring, bool enablePullbackDetection, bool showInfoPanel, int panelFontSize, TextPosition panelPosition, int panelOffsetX, int panelOffsetY, bool enableAlerts, string alertMessage, string alertSound, int minBarsBetweenSignals, int maxSignals, bool useVolumeFilter, int volumeSmaPeriod)
+{
+if (cacheThomasAVWAPContextDashboard != null)
+for (int idx = 0; idx < cacheThomasAVWAPContextDashboard.Length; idx++)
+if (cacheThomasAVWAPContextDashboard[idx] != null && cacheThomasAVWAPContextDashboard[idx].FastEmaPeriod == fastEmaPeriod && cacheThomasAVWAPContextDashboard[idx].SlowEmaPeriod == slowEmaPeriod && cacheThomasAVWAPContextDashboard[idx].AvwapProximityTicks == avwapProximityTicks && cacheThomasAVWAPContextDashboard[idx].UseAtrProximity == useAtrProximity && cacheThomasAVWAPContextDashboard[idx].AvwapProximityAtr == avwapProximityAtr && cacheThomasAVWAPContextDashboard[idx].AtrPeriod == atrPeriod && cacheThomasAVWAPContextDashboard[idx].EnableTrendColoring == enableTrendColoring && cacheThomasAVWAPContextDashboard[idx].EnablePullbackDetection == enablePullbackDetection && cacheThomasAVWAPContextDashboard[idx].ShowInfoPanel == showInfoPanel && cacheThomasAVWAPContextDashboard[idx].PanelFontSize == panelFontSize && cacheThomasAVWAPContextDashboard[idx].PanelPosition == panelPosition && cacheThomasAVWAPContextDashboard[idx].PanelOffsetX == panelOffsetX && cacheThomasAVWAPContextDashboard[idx].PanelOffsetY == panelOffsetY && cacheThomasAVWAPContextDashboard[idx].EnableAlerts == enableAlerts && cacheThomasAVWAPContextDashboard[idx].AlertMessage == alertMessage && cacheThomasAVWAPContextDashboard[idx].AlertSound == alertSound && cacheThomasAVWAPContextDashboard[idx].MinBarsBetweenSignals == minBarsBetweenSignals && cacheThomasAVWAPContextDashboard[idx].MaxSignals == maxSignals && cacheThomasAVWAPContextDashboard[idx].UseVolumeFilter == useVolumeFilter && cacheThomasAVWAPContextDashboard[idx].VolumeSmaPeriod == volumeSmaPeriod && cacheThomasAVWAPContextDashboard[idx].EqualsInput(input))
+return cacheThomasAVWAPContextDashboard[idx];
+return CacheIndicator<ThomasAVWAPContextDashboard>(new ThomasAVWAPContextDashboard(){ FastEmaPeriod = fastEmaPeriod, SlowEmaPeriod = slowEmaPeriod, AvwapProximityTicks = avwapProximityTicks, UseAtrProximity = useAtrProximity, AvwapProximityAtr = avwapProximityAtr, AtrPeriod = atrPeriod, EnableTrendColoring = enableTrendColoring, EnablePullbackDetection = enablePullbackDetection, ShowInfoPanel = showInfoPanel, PanelFontSize = panelFontSize, PanelPosition = panelPosition, PanelOffsetX = panelOffsetX, PanelOffsetY = panelOffsetY, EnableAlerts = enableAlerts, AlertMessage = alertMessage, AlertSound = alertSound, MinBarsBetweenSignals = minBarsBetweenSignals, MaxSignals = maxSignals, UseVolumeFilter = useVolumeFilter, VolumeSmaPeriod = volumeSmaPeriod }, input, ref cacheThomasAVWAPContextDashboard);
+}
+}
+}
+
+namespace NinjaTrader.NinjaScript.MarketAnalyzerColumns
+{
+public partial class MarketAnalyzerColumn : MarketAnalyzerColumnBase
+{
+public Indicators.ThomasAVWAPContextDashboard ThomasAVWAPContextDashboard(int fastEmaPeriod, int slowEmaPeriod, int avwapProximityTicks, bool useAtrProximity, double avwapProximityAtr, int atrPeriod, bool enableTrendColoring, bool enablePullbackDetection, bool showInfoPanel, int panelFontSize, TextPosition panelPosition, int panelOffsetX, int panelOffsetY, bool enableAlerts, string alertMessage, string alertSound, int minBarsBetweenSignals, int maxSignals, bool useVolumeFilter, int volumeSmaPeriod)
+{
+return indicator.ThomasAVWAPContextDashboard(Input, fastEmaPeriod, slowEmaPeriod, avwapProximityTicks, useAtrProximity, avwapProximityAtr, atrPeriod, enableTrendColoring, enablePullbackDetection, showInfoPanel, panelFontSize, panelPosition, panelOffsetX, panelOffsetY, enableAlerts, alertMessage, alertSound, minBarsBetweenSignals, maxSignals, useVolumeFilter, volumeSmaPeriod);
+}
+
+public Indicators.ThomasAVWAPContextDashboard ThomasAVWAPContextDashboard(ISeries<double> input , int fastEmaPeriod, int slowEmaPeriod, int avwapProximityTicks, bool useAtrProximity, double avwapProximityAtr, int atrPeriod, bool enableTrendColoring, bool enablePullbackDetection, bool showInfoPanel, int panelFontSize, TextPosition panelPosition, int panelOffsetX, int panelOffsetY, bool enableAlerts, string alertMessage, string alertSound, int minBarsBetweenSignals, int maxSignals, bool useVolumeFilter, int volumeSmaPeriod)
+{
+return indicator.ThomasAVWAPContextDashboard(input, fastEmaPeriod, slowEmaPeriod, avwapProximityTicks, useAtrProximity, avwapProximityAtr, atrPeriod, enableTrendColoring, enablePullbackDetection, showInfoPanel, panelFontSize, panelPosition, panelOffsetX, panelOffsetY, enableAlerts, alertMessage, alertSound, minBarsBetweenSignals, maxSignals, useVolumeFilter, volumeSmaPeriod);
+}
+}
+}
+
+namespace NinjaTrader.NinjaScript.Strategies
+{
+public partial class Strategy : NinjaTrader.Gui.NinjaScript.StrategyRenderBase
+{
+public Indicators.ThomasAVWAPContextDashboard ThomasAVWAPContextDashboard(int fastEmaPeriod, int slowEmaPeriod, int avwapProximityTicks, bool useAtrProximity, double avwapProximityAtr, int atrPeriod, bool enableTrendColoring, bool enablePullbackDetection, bool showInfoPanel, int panelFontSize, TextPosition panelPosition, int panelOffsetX, int panelOffsetY, bool enableAlerts, string alertMessage, string alertSound, int minBarsBetweenSignals, int maxSignals, bool useVolumeFilter, int volumeSmaPeriod)
+{
+return indicator.ThomasAVWAPContextDashboard(Input, fastEmaPeriod, slowEmaPeriod, avwapProximityTicks, useAtrProximity, avwapProximityAtr, atrPeriod, enableTrendColoring, enablePullbackDetection, showInfoPanel, panelFontSize, panelPosition, panelOffsetX, panelOffsetY, enableAlerts, alertMessage, alertSound, minBarsBetweenSignals, maxSignals, useVolumeFilter, volumeSmaPeriod);
+}
+
+public Indicators.ThomasAVWAPContextDashboard ThomasAVWAPContextDashboard(ISeries<double> input , int fastEmaPeriod, int slowEmaPeriod, int avwapProximityTicks, bool useAtrProximity, double avwapProximityAtr, int atrPeriod, bool enableTrendColoring, bool enablePullbackDetection, bool showInfoPanel, int panelFontSize, TextPosition panelPosition, int panelOffsetX, int panelOffsetY, bool enableAlerts, string alertMessage, string alertSound, int minBarsBetweenSignals, int maxSignals, bool useVolumeFilter, int volumeSmaPeriod)
+{
+return indicator.ThomasAVWAPContextDashboard(input, fastEmaPeriod, slowEmaPeriod, avwapProximityTicks, useAtrProximity, avwapProximityAtr, atrPeriod, enableTrendColoring, enablePullbackDetection, showInfoPanel, panelFontSize, panelPosition, panelOffsetX, panelOffsetY, enableAlerts, alertMessage, alertSound, minBarsBetweenSignals, maxSignals, useVolumeFilter, volumeSmaPeriod);
+}
+}
+}
+
+#endregion
